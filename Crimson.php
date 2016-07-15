@@ -1,56 +1,66 @@
 <?php
 	require_once 'simpleHtmlDom.php';
-	class Crawl {
+
+	class CrimsonHarvester {
 	
-		private $DOM, $url, $body, $urlHost;
+		private $DOM, $url, $body, $urlHost, $initialTime, $pattern;
 		
 		private $uncrawledURLs = [];
 		
 		private $crawledURLs = [];
 		
-		private $foundCourese = [];
-		
+		private $foundCrimsons = [];
+        
+        private $numberOfHarvest = 0;
+        
         
         /*
         *   Constructor the initialize of the proceess
         *   The adds uncrawled links to the waiting list
         *   @params : $links -> Links found on the current page
         */
-		public function __construct($url){
+		public function __construct($url,$pattern){
 			
+            $this->initialTime = time();
+            
+            $this->getURLHost($url);
+            
+            $this->pattern = $pattern;
+            
 			$this->url = $url; // the initial URl morelike the base Url
-			
-			$parsedUrl = parse_url($url); // We need to parse the url so as to get the base url to prevent external links
-			
-			$this->urlHost = $parsedUrl['host']; // here we get the base url
-			
-			$this->startTheCrawling($this->url); // then here we initalize the crawling
+
+            $this->uncrawledURLs[] = $this->url; // Since we have not crawled this url we need to add it to the uncrawled URLs
+            
+			$this->crawl($this->url); // then here we initalize the crawling
 			
 		}
-		
-		private function startTheCrawling($url){
+        
+        
+		private function crawl($url){
 			
-			$this->crawledURLs[] = $url;
+			$this->crawledURLs[] = $url; // since are crawling this url we need to add it to the crawled once so as not to crawl it again
 			
-			// then also remove the $url from $uncrawled urls
+			$this->uncrawledURLs = array_merge(array_diff($this->uncrawledURLs, [$url])); // in the same vein we need to remove it from the uncrawled url
 			
-			$this->body = $this->getBody($url);
+			$this->body = $this->getBody($url); // we get the content of the of the url
 			
-			$this->lookForCourses($this->body->text());
+            // to replace this with native script
+			$this->addLinks($this->body->find('a')); // add all the new links  we find on this page
 			
-			$this->manageLinks($this->body->find('a'));
+            // to replace this with naative script
+			$this->lookForPattern($this->body->text()); // We match out the patterns off
 			
 			if(count($this->uncrawledURLs) == 0){
-			
-				// echo things like the course found time taken and numbe rof url crawled
-				
-				// .txt will need to do a file open stuufs
-			
+			     
+                $duration = time() - $this->initialTime;
+                
+                echo "Crawled " . $this->url . " took " . $duration . " secs. Harvesting  " . $this->numberOfHarvest . " Crimsons through " . count($this->crawledURLs) . " pages";
+                
 				return true;
 			
 			}else{
 			
-				$this->startTheCrawling();
+				return $this->crawl($this->uncrawledURLs[0]);
 			
 			}
 			
@@ -58,11 +68,11 @@
 		
         
         /*
-        *   This Function is used to manage all the links found on each pages that we crawl
+        *   This Function is used to add all the new links found on each pages that we crawl
         *   The adds uncrawled links to the waiting list
         *   @params : $links -> Links found on the current page
         */
-		private function manageLinks($links){
+		private function addLinks($links){
 		
 			foreach ($links as $link){ // Looping through all the link found on this page
 				
@@ -74,7 +84,7 @@
 					
                     if(!in_array($link,$this->uncrawledURLs) ){ // Also we check that we do not have the link in the waiting list
                         
-                        if(!in_array($link,$this->$crawledURLs) ){ // Also we check that we have not crawled the link before
+                        if(!in_array($link,$this->crawledURLs) ){ // Also we check that we have not crawled the link before
                             
                              $this->uncrawledURLs[] =  $link; // then we add the link to the waiting list of uncrawled links
                             
@@ -85,7 +95,7 @@
 				}
 				
 			}
-		
+                
 		}
 	   
         
@@ -93,22 +103,41 @@
         *   This is we slug in the pattern we want to match throughout the text of the content of this page
         *
         */
-		private function extractPattern($text){
-		          
-             $pattern = '/^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]{11,11}).*/';
-	  
-              preg_match($pattern, $url, $matches);
+		private function lookForPattern($text){
+		   
+            preg_match_all($this->pattern, $text, $matches);
 
-              return isset($matches[1]) ? $matches[1] : false;
+            foreach($matches[0] as $match){
                 
-				// preg matter
-				
-				// get it as a plain array 
-				
-				// then merge with no duplicte with $this->foundcourses;
-		
+                if(!in_array($match,  $this->foundCrimsons)){
+                    
+                     $this->foundCrimsons[] = $match;
+                    
+                     $this->numberOfHarvest++;
+                    
+                    
+                    
+                    // want to add files
+                    
+                }
+                
+            }
+            
 		}
+        
+        
+       /*
+        * We need to get url host for url sanitize sake
+        */
+        private function getURLHost($url){
+            
+            $parsedUrl = parse_url($url); // We need to parse the url so as to get the base url to prevent external links
+			
+			$this->urlHost = $parsedUrl['host']; // here we get the base url
+			
+        }
 		
+        
         /*
         *   This is our links standardizer 
         *   @params : $link -> The link we want to standardize
@@ -158,6 +187,7 @@
 			
 		}
 		
+        
         /*
         *   This is where we get the contents of the url from. 
         *   @params : $url -> The link we want to get the content of
@@ -171,6 +201,7 @@
 			
 		}
 		
+        
         /*
         *   This is where we get the body of the content since are bothered by the content of the page and not the metadata 
         *   @params : $url -> The link we want to get the body of
@@ -187,6 +218,6 @@
 	}
 	
 	
-	new Crawl('http://moodle.unilag.edu.ng');
+	new CrimsonHarvester('http://kademiks.com','/[a-zA-Z]{3}(\s)?\d{3}/');
 	
 ?>
