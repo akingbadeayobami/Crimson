@@ -1,4 +1,4 @@
-<?php
+<?php 
 	require_once 'simpleHtmlDom.php';
 
 	class CrimsonHarvester {
@@ -11,8 +11,7 @@
 		
 		private $foundCrimsons = [];
         
-        private $numberOfHarvest = 0;
-        
+        private $numberOfNewHarvest = 0;
         
         /*
         *   Constructor the initialize of the proceess
@@ -25,6 +24,8 @@
             
             $this->getURLHost($url);
             
+            $this->bootstrap();
+            
             $this->pattern = $pattern;
             
 			$this->url = $url; // the initial URl morelike the base Url
@@ -35,11 +36,61 @@
 			
 		}
         
+        private function bootstrap(){
+            
+            // get the URL host check if a folder like that exist
+            
+            // if not create it
+            
+                // and create 3 files crawledurls.txt, foundcrimsons.txt, exceptions.txt
+            
+            // then if it exists 
+                
+                // and the files exist 
+            
+                // pasre the files then add then to content of the files to craled and folders and found crimsson
+            
+        }
+        
+        private function addtoCrawledUrls($url){
+            
+            $this->crawledURLs[] = $url; // since are crawling this url we need to add it to the crawled once so as not to crawl it again
+		
+            
+        }
+        private function specialFunctionForMatches($match){
+            
+            // if the match has word boundary return it 
+            
+            // else add the word boundry in the middle after the theird text
+            
+        }
+        
+        private function addToFoundCrimsons($match){
+            
+             $this->foundCrimsons[] = $match;
+            
+            $match = $this->specialFunctionForMatches($match);
+
+             $this->numberOfNewHarvest++;
+
+        }
+        
+        
+        private function addToExceptions($url, $ex){
+            
+             $this->foundCrimsons[] = $match;
+
+             $this->numberOfNewHarvest++;
+
+        }
+        
+        
         
 		private function crawl($url){
 			
-			$this->crawledURLs[] = $url; // since are crawling this url we need to add it to the crawled once so as not to crawl it again
-			
+            $this->addtoCrawledUrls($url); // since are crawling this url we need to add it to the crawled once so as not to crawl it again
+            
 			$this->uncrawledURLs = array_merge(array_diff($this->uncrawledURLs, [$url])); // in the same vein we need to remove it from the uncrawled url
 			
 			$this->body = $this->getBody($url); // we get the content of the of the url
@@ -54,7 +105,7 @@
 			     
                 $duration = time() - $this->initialTime;
                 
-                echo "Crawled " . $this->url . " took " . $duration . " secs. Harvesting  " . $this->numberOfHarvest . " Crimsons through " . count($this->crawledURLs) . " pages";
+                echo "Crawled " . $this->url . " took <b>" . $duration . " secs</b>. Harvesting  <b>" . $this->numberOfNewHarvest . " Crimsons </b> through <b>" . count($this->crawledURLs) . " pages</b>";
                 
 				return true;
 			
@@ -86,6 +137,8 @@
                         
                         if(!in_array($link,$this->crawledURLs) ){ // Also we check that we have not crawled the link before
                             
+                            // if link does not have time and stuffs
+                            
                              $this->uncrawledURLs[] =  $link; // then we add the link to the waiting list of uncrawled links
                             
                         }
@@ -111,13 +164,7 @@
                 
                 if(!in_array($match,  $this->foundCrimsons)){
                     
-                     $this->foundCrimsons[] = $match;
-                    
-                     $this->numberOfHarvest++;
-                    
-                    
-                    
-                    // want to add files
+                    $this->addToFoundCrimsons($match);
                     
                 }
                 
@@ -145,6 +192,14 @@
         */
 		private function sanitizeUrl($link){
 			
+            $link = strtolower($link); // String to lower to allow uniformity
+            
+            if (substr($link, strlen($link) - 1 , 1) == '/'){ // (http://facebook.com/) => {http://facebook.com}
+        
+                $link = substr($link, 0, strlen($link) - 1 ); // removes all trailing slashes
+
+            }
+            
 			if(strpos($link, "#")){ // (home.php#bottom) => {home.php}
 				
 				$link = substr($link, 0 , strpos($link, "#")); // Removes all ID references since they are not needed
@@ -195,8 +250,16 @@
         */
 		private function getDOM($url){
 			
-			$blob = file_get_contents($url);
+            try{
             
+			    $blob = file_get_contents($url);
+            
+            }catch(Exception $ex){
+
+                $this->addToExceptions($url, $ex);
+                
+            }
+            		
 			return str_get_html($blob);
 			
 		}
