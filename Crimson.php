@@ -1,117 +1,163 @@
 <?php 
+
+    /*
+    * Project : Crimson Harvester
+    * Description : A Pattern Extractor from a website. Like you want tot extract all the emails from a target website or phone numbers etc just feed the target url, and the pattern (regular expression) you want to extract
+    * Usage : 	new CrimsonHarvester('http://mytarget.com','/my/regular/expression/');
+    * Date : 19 - 7 - 2016 
+    * Author: Akingbade Ayobami Samuel
+    */
+
 	require_once 'simpleHtmlDom.php';
 
 	class CrimsonHarvester {
 	
-		private $DOM, $url, $body, $urlHost, $initialTime, $pattern;
-		
-		private $uncrawledURLs = [];
-		
-		private $crawledURLs = [];
-		
-		private $foundCrimsons = [];
+	private $url, $pattern; // Instance variables
+	
+	private  $urlHost, $initialTime; // Project Variables
+	
+	private $_crawledURLs, $_foundCrimsons, $_caughtExceptions; // File Handlers
+	
+	private $uncrawledURLs = [],  $crawledURLs = [],  $foundCrimsons = [], $caughtExceptions = []; // Project Containers
         
-        private $numberOfNewHarvest = 0;
+        private $numberOfNewHarvest = 0, $numberOfCrawledURLs = 0 , $numberOfExceptions = 0; // Counters
         
+		
+		
         /*
         *   Constructor the initialize of the proceess
         *   The adds uncrawled links to the waiting list
         *   @params : $links -> Links found on the current page
         */
-		public function __construct($url,$pattern){
+	public function __construct($url,$pattern){
 			
-            $this->initialTime = time();
+        	$this->initialTime = time(); // We get the timestamp of when we started the crawling
             
-            $this->getURLHost($url);
+        	$this->getURLHost($url); // we get the urlost
             
-            $this->bootstrap();
+        	$this->filesBootstrap(); // we do fileboostrapping
             
-            $this->pattern = $pattern;
+        	$this->pattern = $pattern; // then we get the patterns
             
-			$this->url = $url; // the initial URl morelike the base Url
+		$this->url = $url; // the initial URl morelike the base Url
 
-            $this->uncrawledURLs[] = $this->url; // Since we have not crawled this url we need to add it to the uncrawled URLs
+        	$this->uncrawledURLs[] = $this->url; // Since we have not crawled this url we need to add it to the uncrawled URLs
             
-			$this->crawl($this->url); // then here we initalize the crawling
+	    	$this->crawl($this->url); // then here we initalize the crawling
 			
-		}
+	}
         
-        private function bootstrap(){
+		/*
+		* Here we handle the file operations so as to resume the operations whenever it stops for any reason
+		* Creates a folder if it doesnot exist else it reads the content for continuation
+		*/
+        private function filesBootstrap(){
             
-            // get the URL host check if a folder like that exist
-            
-            // if not create it
-            
-                // and create 3 files crawledurls.txt, foundcrimsons.txt, exceptions.txt
-            
-            // then if it exists 
-                
-                // and the files exist 
-            
-                // pasre the files then add then to content of the files to craled and folders and found crimsson
-            
+		if(file_exists($this->urlHost)){  // if the folder for this project exists
+
+			$crawled = file( $this->urlHost . '/crawled.txt'); // then load the the crawled files to this project
+			
+			foreach($crawled as $f){ // loop through
+			
+				$this->crawledURLs[] =  trim($f); // append the array
+			
+			}
+			
+			
+			$crimsons = file( $this->urlHost . '/crimsons.txt'); // then load the the crimsons files to this project
+			
+			foreach($crimsons as $f){ // loop through
+			
+				$this->foundCrimsons[] =  trim($f); // append the array
+			
+			}
+			
+		
+		}else{ // else if the folde project doesnot exitt
+	
+			mkdir($this->urlHost);  // then make the file
+				
+		}
+
+		$this->_crawledURLs = fopen($this->urlHost . '/crawled.txt', 'a');  //open the crawled files for appending or create it
+	
+		$this->_foundCrimsons = fopen($this->urlHost . '/crimsons.txt', 'a');  // open the crimsons file for appending or create it
+	
+		$this->_caughtExceptions = fopen($this->urlHost . '/exceptions.txt', 'a');  // open the exception file for appending or create it
+	
         }
         
+		// manage the crawled url
         private function addtoCrawledUrls($url){
             
             $this->crawledURLs[] = $url; // since are crawling this url we need to add it to the crawled once so as not to crawl it again
+			
+			fwrite($this->_crawledURLs, $url .  "\n"); // write to file
+			
+			$this->numberOfCrawledURLs++; // increment the operator
+			
+        }
 		
-            
-        }
-        private function specialFunctionForMatches($match){
-            
-            // if the match has word boundary return it 
-            
-            // else add the word boundry in the middle after the theird text
-            
-        }
-        
+		// manage the found crimsons
         private function addToFoundCrimsons($match){
+			
+            $this->foundCrimsons[] = $match; // append to array
             
-             $this->foundCrimsons[] = $match;
-            
-            $match = $this->specialFunctionForMatches($match);
-
-             $this->numberOfNewHarvest++;
+			fwrite($this->_foundCrimsons, $match .  "\n"); // write to file
+			
+            $this->numberOfNewHarvest++; // increment the counter
 
         }
         
-        
+        // Manage the exceptions logging
         private function addToExceptions($url, $ex){
             
-             $this->foundCrimsons[] = $match;
-
-             $this->numberOfNewHarvest++;
-
+             $this->caughtExceptions[] = $url . ": " . $ex ; // append to array
+			 
+			 fwrite($this->_caughtExceptions, $url . ": " . $ex  .  "\n"); // wite to file
+			 
+			 $this->numberOfExceptions++; // increment the counter
+			 
         }
         
-        
-        
-		private function crawl($url){
+        /*
+		*	CORE of the Crimson Harvester
+		*	This is where we are doing the actual crawling of each URl
+		*	This is where the recursions is been done
+		*/
+	private function crawl($url){
 			
             $this->addtoCrawledUrls($url); // since are crawling this url we need to add it to the crawled once so as not to crawl it again
             
 			$this->uncrawledURLs = array_merge(array_diff($this->uncrawledURLs, [$url])); // in the same vein we need to remove it from the uncrawled url
 			
-			$this->body = $this->getBody($url); // we get the content of the of the url
+			$body= $this->getBody($url); // we get the content of the of the url
 			
             // to replace this with native script
-			$this->addLinks($this->body->find('a')); // add all the new links  we find on this page
+			$this->addLinks($body->find('a')); // add all the new links  we find on this page
 			
             // to replace this with naative script
-			$this->lookForPattern($this->body->text()); // We match out the patterns off
+			$this->lookForPattern($body->text()); // We match out the patterns off
 			
-			if(count($this->uncrawledURLs) == 0){
+			if(count($this->uncrawledURLs) == 0){ // If we have fiished crawling
 			     
-                $duration = time() - $this->initialTime;
+                $duration = time() - $this->initialTime; // get the total time
                 
-                echo "Crawled " . $this->url . " took <b>" . $duration . " secs</b>. Harvesting  <b>" . $this->numberOfNewHarvest . " Crimsons </b> through <b>" . count($this->crawledURLs) . " pages</b>";
+                echo "Crawling " . $this->url . ".\n"; 
+				
+				echo "Took " . $duration . " secs.\n";
+
+				echo "Harvesting  " . $this->numberOfNewHarvest . " Crimsons.\n";
+
+				echo "Through " . $this->numberOfCrawledURLs . " pages.\n";
+						
+				echo "Catching " . $this->numberOfExceptions . " exceptions.\n";
                 
-				return true;
+				return true; // end the whole journey
 			
 			}else{
 			
-				return $this->crawl($this->uncrawledURLs[0]);
+				return $this->crawl($this->uncrawledURLs[0]); // go on and take on the next URL
 			
 			}
 			
@@ -136,11 +182,13 @@
                     if(!in_array($link,$this->uncrawledURLs) ){ // Also we check that we do not have the link in the waiting list
                         
                         if(!in_array($link,$this->crawledURLs) ){ // Also we check that we have not crawled the link before
+                             
+                            if(strpos($link, '?time=') === false && strpos($link, '&time=') === false && preg_match('/\d{10}/', $link) == 0 ){ // Also to chack that we donot have any time generated link to avoid useless recursions on a same page
+                           
+								$this->uncrawledURLs[] =  $link; // then we add the link to the waiting list of uncrawled links
                             
-                            // if link does not have time and stuffs
-                            
-                             $this->uncrawledURLs[] =  $link; // then we add the link to the waiting list of uncrawled links
-                            
+							}
+							
                         }
                         
                     }
@@ -154,17 +202,17 @@
         
         /*
         *   This is we slug in the pattern we want to match throughout the text of the content of this page
-        *
+        *	And then we collect our found patterns
         */
 		private function lookForPattern($text){
 		   
-            preg_match_all($this->pattern, $text, $matches);
+            preg_match_all($this->pattern, $text, $matches); // here we perform the regualr expression
 
-            foreach($matches[0] as $match){
-                
-                if(!in_array($match,  $this->foundCrimsons)){
+            foreach($matches[0] as $match){ // loop through the results
+                 
+                if(!in_array($match,  $this->foundCrimsons)){ // makes sure tht we dont have this result already collected
                     
-                    $this->addToFoundCrimsons($match);
+                    $this->addToFoundCrimsons($match); // then we add to the crimsons collected
                     
                 }
                 
@@ -250,18 +298,12 @@
         */
 		private function getDOM($url){
 			
-            try{
-            
-			    $blob = file_get_contents($url);
-            
-            }catch(Exception $ex){
-
-                $this->addToExceptions($url, $ex);
-                
-            }
-            		
+			$blob = file_get_contents($url);
+					
 			return str_get_html($blob);
-			
+            
+            // $this->addToExceptions($url, $ex);
+            
 		}
 		
         
@@ -280,7 +322,6 @@
 	
 	}
 	
-	
-	new CrimsonHarvester('http://kademiks.com','/[a-zA-Z]{3}(\s)?\d{3}/');
+
 	
 ?>
